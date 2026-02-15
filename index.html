@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VRChat Sticker Maker</title>
+    <title>VRC Sticker Maker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -15,17 +15,17 @@
 <body>
     <div id="app">
         <aside class="sidebar">
-            <h1>VRC+ Sticker Maker</h1>
+            <h1>VRC Sticker Maker</h1>
 
             <div class="control-group">
-                <label for="image-upload">アバター画像をアップロード</label>
+                <label for="image-upload">画像をアップロード</label>
                 <input type="file" id="image-upload" accept="image/png, image/jpeg" style="display: none;">
                 <button id="upload-btn">画像を選択</button>
             </div>
 
             <div class="control-group">
                 <label for="bubble-text">テキスト入力</label>
-                <input type="text" id="bubble-text" placeholder="メッセージを入力..." value="Hello VRChat!">
+                <input type="text" id="bubble-text" placeholder="メッセージを入力..." value="Hello!">
             </div>
 
 
@@ -61,7 +61,20 @@
             </div>
 
             <div class="control-group">
-                <label>レイヤー (選択して↑↓で順序変更)</label>
+                <label>コンポーネント追加</label>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button id="add-bubble-btn" class="secondary"
+                        style="width: 100%; margin-bottom: 0.5rem; padding: 0.5rem;">💭 吹き出しを追加</button>
+                    <button class="secondary" onclick="addShape('star')" style="flex: 1; padding: 0.5rem;">⭐ 星</button>
+                    <button class="secondary" onclick="addShape('heart')" style="flex: 1; padding: 0.5rem;">❤️
+                        ハート</button>
+                    <button class="secondary" onclick="addShape('sparkle')" style="flex: 1; padding: 0.5rem;">✨
+                        輝き</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>レイヤー (ドラッグして順序変更)</label>
                 <div id="layer-list" class="layer-list">
                     <!-- Layers will be injected here -->
                 </div>
@@ -79,6 +92,12 @@
             <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem;">
                 <button id="save-btn">スタンプを保存</button>
                 <button id="clear-btn" class="secondary">リセット</button>
+            </div>
+
+            <div
+                style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #373a40; font-size: 0.65rem; color: #909296; line-height: 1.4;">
+                <p>※ 本ツールは非公式のコミュニティプロジェクトであり、VRChat Inc.とは関係ありません。</p>
+                <p>※ This is an unofficial community tool and not affiliated with VRChat Inc.</p>
             </div>
         </aside>
 

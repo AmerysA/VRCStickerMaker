@@ -10,7 +10,6 @@ const CORNER_RADIUS = 12;
 // State
 let canvas;
 let currentBubbleGroup;
-let avatarImage;
 
 // Configure Fabric globals
 if (typeof fabric !== 'undefined') {
@@ -44,6 +43,13 @@ function initCanvas() {
         backgroundColor: '#1a1b1e',
         preserveObjectStacking: true
     });
+    setupBasics();
+}
+
+function setupBasics() {
+    // Clear old ones if they exist (for safety during reset)
+    const existing = canvas.getObjects().filter(o => ['artboard_bg', 'shroud_group', 'guide_border'].includes(o.name));
+    existing.forEach(o => canvas.remove(o));
 
     // Artboard background (Checkerboard for transparency visualization)
     const checkerSize = 20;
@@ -180,18 +186,28 @@ function setupEventListeners() {
 
     canvas.on('selection:created', (e) => {
         if (e.selected && e.selected[0]) {
-            if (opacityInput) opacityInput.value = (e.selected[0].opacity || 1) * 100;
-            if (e.selected[0] === currentBubbleGroup && bubbleScaleInput) {
+            const obj = e.selected[0];
+            if (opacityInput) opacityInput.value = (obj.opacity || 1) * 100;
+            if (obj === currentBubbleGroup && bubbleScaleInput) {
                 bubbleScaleInput.value = currentBubbleGroup.scaleX.toFixed(2);
+            }
+            // Update currentBubbleGroup if a bubble is selected
+            if (obj.type === 'group' && obj.item(1) instanceof fabric.Textbox) {
+                currentBubbleGroup = obj;
             }
         }
         updateLayerList();
     });
     canvas.on('selection:updated', (e) => {
         if (e.selected && e.selected[0]) {
-            if (opacityInput) opacityInput.value = (e.selected[0].opacity || 1) * 100;
-            if (e.selected[0] === currentBubbleGroup && bubbleScaleInput) {
+            const obj = e.selected[0];
+            if (opacityInput) opacityInput.value = (obj.opacity || 1) * 100;
+            if (obj === currentBubbleGroup && bubbleScaleInput) {
                 bubbleScaleInput.value = currentBubbleGroup.scaleX.toFixed(2);
+            }
+            // Update currentBubbleGroup if a bubble is selected
+            if (obj.type === 'group' && obj.item(1) instanceof fabric.Textbox) {
+                currentBubbleGroup = obj;
             }
         }
         updateLayerList();
@@ -202,14 +218,33 @@ function setupEventListeners() {
     const saveBtn = document.getElementById('save-btn');
     if (saveBtn) saveBtn.addEventListener('click', saveCanvas);
 
+    // Add Bubble button
+    const addBubbleBtn = document.getElementById('add-bubble-btn');
+    if (addBubbleBtn) addBubbleBtn.addEventListener('click', () => addSpeechBubble());
+
     // Clear
     const clearBtn = document.getElementById('clear-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
+            if (!confirm('全てのレイヤーを削除してリセットしますか？')) return;
+
             canvas.clear();
-            avatarImage = null;
+            canvas.setBackgroundColor('#1a1b1e', canvas.renderAll.bind(canvas));
+
+            // Reset state
+            currentBubbleGroup = null;
+
+            // Reset DOM
+            if (textInput) textInput.value = "Hello!";
             if (bubbleScaleInput) bubbleScaleInput.value = 1.0;
-            initCanvas(); // Re-initialize shroud and guide
+            if (opacityInput) opacityInput.value = 100;
+
+            const bgPick = document.getElementById('bg-color-picker');
+            const borderPick = document.getElementById('border-color-picker');
+            if (bgPick) bgPick.value = "#3a4454";
+            if (borderPick) borderPick.value = "#3a4454";
+
+            setupBasics(); // Re-add workspace UI
             addSpeechBubble();
             updateLayerList();
         });
@@ -230,9 +265,6 @@ function handleUpload(e) {
     const reader = new FileReader();
     reader.onload = (f) => {
         fabric.Image.fromURL(f.target.result, (img) => {
-            if (avatarImage) canvas.remove(avatarImage);
-            avatarImage = img;
-
             const scale = Math.min(CANVAS_SIZE / img.width, CANVAS_SIZE / img.height) * 0.8;
             img.scale(scale);
             img.set({
@@ -253,14 +285,16 @@ function handleUpload(e) {
             keepUIOnTop();
             canvas.setActiveObject(img);
             canvas.renderAll();
+            updateLayerList();
         });
     };
     reader.readAsDataURL(file);
+    e.target.value = ""; // Allow re-uploading same file
 }
 
 function addSpeechBubble() {
     const textElem = document.getElementById('bubble-text');
-    const defaultText = textElem ? textElem.value : "Hello VRChat!";
+    const defaultText = textElem ? textElem.value : "Hello!";
     const bgColor = document.getElementById('bg-color-picker').value;
     const borderColor = document.getElementById('border-color-picker').value;
     const maxWidth = 380; // Standard max width
@@ -307,6 +341,7 @@ function addSpeechBubble() {
     keepUIOnTop();
     canvas.setActiveObject(group);
     canvas.renderAll();
+    updateLayerList();
 }
 
 function updateBubbleText(val) {
@@ -372,23 +407,88 @@ function updateLayerList() {
         const item = document.createElement('div');
         item.className = 'layer-item' + (activeObject === obj ? ' active' : '');
 
-        let name = "オブジェクト";
-        if (obj.type === 'image') name = "アバター画像";
-        if (obj.type === 'group' || obj.type === 'textbox') {
-            const textSource = obj.type === 'group' ? obj.item(1).text : obj.text;
-            name = "吹き出し: " + (textSource.substring(0, 10) + (textSource.length > 10 ? "..." : ""));
+        let name = obj.name || "オブジェクト";
+        let isDeco = false;
+
+        // Determine display name and deco status
+        if (obj.type === 'image' && !obj.name) name = "画像";
+
+        if (obj.name && obj.name.includes('deco_')) {
+            isDeco = true;
+            name = obj.name
+                .replace('deco_star', 'デコ: 星')
+                .replace('deco_heart', 'デコ: ハート')
+                .replace('deco_sparkle', 'デコ: キラキラ');
         }
 
+        if (obj.type === 'group' || obj.type === 'textbox') {
+            const textItem = obj.type === 'group' ? obj.item(1) : obj;
+            const textSource = textItem ? textItem.text : "";
+            const bubbleLabel = "吹き出し: " + (textSource.substring(0, 10) + (textSource.length > 10 ? "..." : ""));
+            // For bubbles, we always show text content, but can append copy number if it exists in obj.name
+            const match = obj.name ? obj.name.match(/ \((\d+)\)$/) : null;
+            name = bubbleLabel + (match ? match[0] : "");
+        }
+
+        const colorPickerHTML = isDeco ? `
+            <input type="color" value="${obj.fill}" class="layer-color-picker" title="色を変更">
+        ` : '';
+
         item.innerHTML = `
-            <span>${name}</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
+                ${colorPickerHTML}
+                <span>${name}</span>
+            </div>
             <div class="layer-controls">
-                <button onclick="moveLayer(${actualIndex}, 'up')">↑</button>
-                <button onclick="moveLayer(${actualIndex}, 'down')">↓</button>
+                <button onclick="cloneLayerByObjIndex(${actualIndex})" title="複製" style="background-color: #228be6;">📄</button>
+                <button onclick="deleteLayerByObjIndex(${actualIndex})" title="削除" style="background-color: #fa5252;">✕</button>
             </div>
         `;
 
+        if (isDeco) {
+            const picker = item.querySelector('.layer-color-picker');
+            picker.addEventListener('input', (e) => {
+                obj.set('fill', e.target.value);
+                canvas.renderAll();
+            });
+            picker.addEventListener('click', (e) => e.stopPropagation());
+        }
+
+        // Drag and Drop implementation
+        item.setAttribute('draggable', true);
+        item.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', actualIndex);
+            item.classList.add('dragging');
+        });
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            item.classList.add('drag-over');
+        });
+        item.addEventListener('dragleave', () => {
+            item.classList.remove('drag-over');
+        });
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            const allItems = listContainer.querySelectorAll('.layer-item');
+            allItems.forEach(i => i.classList.remove('drag-over'));
+        });
+        item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
+            const targetIndex = actualIndex;
+            if (sourceIndex !== targetIndex) {
+                const sourceObj = canvas.getObjects()[sourceIndex];
+                if (sourceObj) {
+                    canvas.moveTo(sourceObj, targetIndex);
+                    keepUIOnTop();
+                    canvas.renderAll();
+                    updateLayerList();
+                }
+            }
+        });
+
         item.addEventListener('click', (e) => {
-            if (e.target.closest('.layer-controls')) return;
+            if (e.target.closest('.layer-controls') || e.target.closest('.layer-color-picker')) return;
             canvas.setActiveObject(obj);
             canvas.renderAll();
         });
@@ -396,28 +496,132 @@ function updateLayerList() {
     });
 }
 
-window.moveLayer = function (index, direction) {
+window.cloneLayerByObjIndex = function (index) {
     const objects = canvas.getObjects();
     const obj = objects[index];
     if (!obj) return;
 
-    if (direction === 'up' && index < objects.length - 1) {
-        canvas.moveTo(obj, index + 1);
-    } else if (direction === 'down' && index > 0) {
-        // Don't move below artboard_bg
-        const artboardBG = canvas.getObjects().find(o => o.name === 'artboard_bg');
-        const minIndex = artboardBG ? canvas.getObjects().indexOf(artboardBG) + 1 : 0;
-        if (index > minIndex) {
-            canvas.moveTo(obj, index - 1);
-        }
+    // Prevent cloning UI elements
+    if (['shroud_group', 'guide_border', 'artboard_bg'].includes(obj.name)) {
+        console.warn("UI elements cannot be cloned.");
+        return;
     }
-    keepUIOnTop();
+
+    obj.clone((cloned) => {
+        canvas.discardActiveObject();
+
+        // Handle naming
+        let baseName = obj.name || (obj.type === 'image' ? "画像" : (obj.type === 'group' ? "吹き出し" : "オブジェクト"));
+        const match = baseName.match(/(.+) \((\d+)\)$/);
+        let newName;
+        if (match) {
+            newName = `${match[1]} (${parseInt(match[2]) + 1})`;
+        } else {
+            newName = `${baseName} (2)`;
+        }
+
+        cloned.set({
+            left: cloned.left + 20,
+            top: cloned.top + 20,
+            evented: true,
+            name: newName
+        });
+
+        if (cloned.type === 'activeSelection') {
+            cloned.canvas = canvas;
+            cloned.forEachObject((o) => canvas.add(o));
+            cloned.setCoords();
+        } else {
+            // Insert exactly above the original
+            canvas.insertAt(cloned, index + 1);
+        }
+
+        canvas.setActiveObject(cloned);
+        keepUIOnTop();
+        canvas.renderAll();
+        updateLayerList();
+    });
+};
+
+window.deleteLayerByObjIndex = function (index) {
+    const objects = canvas.getObjects();
+    const obj = objects[index];
+    if (!obj) return;
+
+    canvas.remove(obj);
+    if (obj === currentBubbleGroup) currentBubbleGroup = null;
+
     canvas.renderAll();
     updateLayerList();
 };
 
+
+window.addShape = function (type) {
+    let shape;
+    const color = document.getElementById('bg-color-picker').value;
+
+    if (type === 'star') {
+        // 5-point star
+        const points = [];
+        const numPoints = 5;
+        const outRadius = 30;
+        const innerRadius = 15;
+        for (let i = 0; i < numPoints * 2; i++) {
+            const r = (i % 2 === 0) ? outRadius : innerRadius;
+            const a = (i * Math.PI) / numPoints;
+            points.push({ x: r * Math.sin(a), y: -r * Math.cos(a) });
+        }
+        shape = new fabric.Polygon(points, {
+            fill: color,
+            name: 'deco_star'
+        });
+    } else if (type === 'heart') {
+        const path = "M 272.70141,238.71731 C 206.46141,238.71731 152.70141,292.47731 152.70141,358.71731 C 152.70141,493.47282 288.63461,528.80461 381.26381,662.02535 C 468.83811,524.97599 609.82611,490.11135 609.82611,358.71731 C 609.82611,292.47731 556.06611,238.71731 489.82611,238.71731 C 441.77851,238.71731 400.42481,267.08774 381.26381,307.90481 C 362.10281,267.08774 320.74911,238.71731 272.70141,238.71731 z ";
+        shape = new fabric.Path(path, {
+            fill: color,
+            scaleX: 0.15,
+            scaleY: 0.15,
+            name: 'deco_heart'
+        });
+    } else if (type === 'sparkle') {
+        const points = [];
+        const numPoints = 4;
+        const outRadius = 30;
+        const innerRadius = 6;
+        for (let i = 0; i < numPoints * 2; i++) {
+            const r = (i % 2 === 0) ? outRadius : innerRadius;
+            const a = (i * Math.PI) / numPoints;
+            points.push({ x: r * Math.sin(a), y: -r * Math.cos(a) });
+        }
+        shape = new fabric.Polygon(points, {
+            fill: color,
+            name: 'deco_sparkle'
+        });
+    }
+
+    if (shape) {
+        shape.set({
+            left: OFFSET_X + CANVAS_SIZE / 2,
+            top: OFFSET_Y + CANVAS_SIZE / 2,
+            originX: 'center',
+            originY: 'center',
+            cornerColor: '#4ade80',
+            cornerStyle: 'circle',
+            transparentCorners: false,
+            hasControls: true
+        });
+        // Explicitly ensure rotation is visible (mtr)
+        shape.setControlsVisibility({ mtr: true });
+
+        canvas.add(shape);
+        canvas.setActiveObject(shape);
+        keepUIOnTop();
+        canvas.renderAll();
+        updateLayerList();
+    }
+};
+
 function updateBubbleColors() {
-    if (!currentBubbleGroup) return;
     const bgColor = document.getElementById('bg-color-picker').value;
     const borderColor = document.getElementById('border-color-picker').value;
 
@@ -425,6 +629,8 @@ function updateBubbleColors() {
     const g = parseInt(bgColor.slice(3, 5), 16);
     const b = parseInt(bgColor.slice(5, 7), 16);
     const rgbaBg = `rgba(${r}, ${g}, ${b}, 0.9)`;
+
+    if (!currentBubbleGroup) return;
 
     const rect = currentBubbleGroup.item(0);
     rect.set({
@@ -459,7 +665,7 @@ function saveCanvas() {
     canvas.renderAll();
 
     const link = document.createElement('a');
-    link.download = `vrc_plus_sticker_${targetSize}px.png`;
+    link.download = `vrc_sticker_${targetSize}px.png`;
     link.href = dataURL;
     link.click();
 }
