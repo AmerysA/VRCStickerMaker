@@ -1,3 +1,5 @@
+WEBページURL:https://amerysa.github.io/VRCStickerMaker/
+
 本ツールは以下のオープンソースソフトウェアおよびフォントを使用しています。
 ### ライブラリ
 *   **Fabric.js** (v5.3.1)
