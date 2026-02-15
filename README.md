@@ -1,10 +1,11 @@
 # VRC Sticker Maker (Unofficial)
 
 VRChat風の吹き出しスタンプを簡単に作成できるブラウザベースのツールです。
-アバターの透過PNGや装飾パーツを自由に組み合わせてスタンプを作成できます。
+アバターの透過PNGや装飾パーツを自由に組み合わせて、高画質なスタンプを作成できます。
 
 ## 🚀 ツールURL
-https://amerysa.github.io/VRCStickerMaker/
+[https://your-username.github.io/VRChatStickerMaker/](https://your-username.github.io/VRChatStickerMaker/)
+*(GitHub Pagesで公開した際のURLに書き換えてください)*
 
 ## ✨ 主な機能
 - **VRChat風吹き出し**: 文字数に合わせた自動改行と動的なサイズ調整に対応。
@@ -37,4 +38,3 @@ https://amerysa.github.io/VRCStickerMaker/
 ## ⚠️ 免責事項
 本ツールはコミュニティによる非公式プロジェクトであり、VRChat公式とは一切関係ありません。
 本ツールを使用して作成された画像に関する責任はすべて利用者に帰属します。
-
