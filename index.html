@@ -67,6 +67,15 @@
                 </div>
             </div>
 
+            <div class="control-group">
+                <label for="export-size">書き出し解像度</label>
+                <select id="export-size"
+                    style="background-color: #1a1b1e; border: 1px solid var(--border-color); color: white; padding: 0.5rem; border-radius: 8px;">
+                    <option value="512">512 x 512 (標準)</option>
+                    <option value="1024">1024 x 1024 (高画質)</option>
+                </select>
+            </div>
+
             <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem;">
                 <button id="save-btn">スタンプを保存</button>
                 <button id="clear-btn" class="secondary">リセット</button>
@@ -75,7 +84,7 @@
 
         <main class="main-content">
             <div class="canvas-container-wrapper">
-                <div id="canvas-info">512 x 512 (Transparent PNG)</div>
+                <div id="canvas-info">Workspace(Transparent PNG)</div>
                 <canvas id="canvas"></canvas>
             </div>
         </main>

@@ -440,20 +440,26 @@ function saveCanvas() {
     uiElements.forEach(el => el.set('visible', false));
     canvas.renderAll();
 
+    // Calculate multiplier based on selected export size
+    const exportSizeSelect = document.getElementById('export-size');
+    const targetSize = exportSizeSelect ? parseInt(exportSizeSelect.value) : 512;
+    const exportMultiplier = targetSize / CANVAS_SIZE;
+
     const dataURL = canvas.toDataURL({
         format: 'png',
         quality: 1.0,
         left: OFFSET_X,
         top: OFFSET_Y,
         width: CANVAS_SIZE,
-        height: CANVAS_SIZE
+        height: CANVAS_SIZE,
+        multiplier: exportMultiplier
     });
 
     uiElements.forEach(el => el.set('visible', true));
     canvas.renderAll();
 
     const link = document.createElement('a');
-    link.download = 'vrc_plus_sticker.png';
+    link.download = `vrc_plus_sticker_${targetSize}px.png`;
     link.href = dataURL;
     link.click();
 }
