@@ -1,32 +1,40 @@
-WEBページURL:https://amerysa.github.io/VRCStickerMaker/
+# VRC Sticker Maker (Unofficial)
 
-VRChat Sticker Maker
-こだわりのパーツを組み合わせて、理想のスタンプを形に。
+VRChat風の吹き出しスタンプを簡単に作成できるブラウザベースのツールです。
+アバターの透過PNGや装飾パーツを自由に組み合わせてスタンプを作成できます。
 
-このツールは、VRChat Plus のスタンプ機能を最大限に活用するための合成・作成ツールです。 標準搭載のテンプレートだけでなく、お手持ちの透過PNG画像などを自由にインポートして組み合わせることで、誰でも直感的にハイクオリティなスタンプを作成できます。
+## 🚀 ツールURL
+https://amerysa.github.io/VRCStickerMaker/
 
-🌟 柔軟なコンポーネント管理
-透過データ対応: アバター画像や自作の装飾素材など、透過PNGを自由に読み込んで配置できます。
-スマート吹き出し: VRChat公式風のバブルを再現。文字数に応じた自動リサイズに加え、手動でのスケーリングや複製も自由自在。
-標準デコレーション: 座標計算で描画される「星・ハート・キラキラ」を内蔵。ベクター形式なので色変更や拡大も劣化なし。
-レイヤーシステム: すべてのパーツを一覧で管理。重なり順の変更、複製、削除をスムーズに行えます。
+## ✨ 主な機能
+- **VRChat風吹き出し**: 文字数に合わせた自動改行と動的なサイズ調整に対応。
+- **マルチ画像アップロード**: 複数の透過PNG画像を読み込み、自由に重ねて配置可能。
+- **デコレーション素材**: 星、ハート、キラキラなどの図形を標準搭載。
+- **高度なレイヤー管理**:
+  - ドラッグ＆ドロップによる直感的な並び替え。
+  - レイヤーの複製（自動ナンバリング付与）。
+  - 個別のカラーカスタマイズ。
+- **高画質エクスポート**: 編集画面のサイズを維持しつつ、書き出し時のみ1024pxの高解像度で出力。
+- **プライバシー保護**: 画像処理はすべてブラウザ内で行われるため、サーバーに画像がアップロードされることはありません。
 
-🚀 あなただけのスタンプ作り
-背景やメインとなる画像をアップロード（複数枚の組み合わせも可能）
-吹き出しや内蔵デコレーションを追加
-必要に応じてお手持ちの装飾用PNGを追加インポート
-自由に配置・複製・回転させて、あなただけの最高の一枚をエクスポート！
+## 🛠 使用技術
+- [Fabric.js](http://fabricjs.com/) - キャンバス操作・オブジェクト管理
+- [Google Fonts (Noto Sans JP)](https://fonts.google.com/specimen/Noto+Sans+JP) - メインフォント
+- [Google Fonts (Noto Color Emoji)](https://fonts.google.com/specimen/Noto+Color+Emoji) - 絵文字サポート
+- Vanilla JS / HTML5 / CSS3
 
-本ツールは以下のオープンソースソフトウェアおよびフォントを使用しています。
-### ライブラリ
-*   **Fabric.js** (v5.3.1)
-    *   ライセンス: [MIT License](https://github.com/fabricjs/fabric.js/blob/master/LICENSE)
-    *   用途: キャンバス操作および描画エンジンのコアとして使用
-### フォント
-*   **Noto Sans JP**
-    *   提供元: Google Fonts
-    *   ライセンス: [SIL Open Font License 1.1](https://scripts.sil.org/OFL)
-    *   用途: 吹き出し内テキストおよびUIの標準フォントとして使用
-### 技術構成
-*   HTML5 / CSS3 / Vanilla JavaScript
-*   ライブラリはCDN経由（cdnjs / Google Fonts）で読み込み
+## ⚖️ ライセンス
+### ツール本体
+このプロジェクトは [MIT License](LICENSE) の下で公開されています。
+
+### サードパーティ・ライセンス
+本ツールでは以下のオープンソースライブラリおよびフォントを使用しています。
+
+- **Fabric.js**: [MIT License](https://github.com/fabricjs/fabric.js/blob/master/LICENSE)
+- **Noto Sans JP**: [SIL Open Font License 1.1](https://scripts.sil.org/OFL)
+- **Noto Color Emoji**: [SIL Open Font License 1.1](https://scripts.sil.org/OFL)
+
+## ⚠️ 免責事項
+本ツールはコミュニティによる非公式プロジェクトであり、VRChat公式とは一切関係ありません。
+本ツールを使用して作成された画像に関する責任はすべて利用者に帰属します。
+
