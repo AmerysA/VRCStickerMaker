@@ -1,24 +1,29 @@
 // Constants
 const CANVAS_SIZE = 512;
-const WORK_WIDTH = 1440;  // Wide workspace for landscape images
-const WORK_HEIGHT = 800;   // Height managed for 1080p
-const OFFSET_X = (WORK_WIDTH - CANVAS_SIZE) / 2;
-const OFFSET_Y = (WORK_HEIGHT - CANVAS_SIZE) / 2;
 const BUBBLE_PADDING = 16;
 const CORNER_RADIUS = 12;
 
 // State
 let canvas;
 let currentBubbleGroup;
+let currentZoom = 1.0;
 
 // Configure Fabric globals
 if (typeof fabric !== 'undefined') {
-    fabric.Object.prototype.perPixelTargetFind = true; // Click through transparent pixels
+    fabric.Object.prototype.perPixelTargetFind = true;
     fabric.Object.prototype.targetFindTolerance = 4;
-    fabric.Object.prototype.lockUniScaling = true;    // Force proportional scaling
-    fabric.Object.prototype.lockScalingFlip = true;   // Prevent inversion/flipping
+    fabric.Object.prototype.lockUniScaling = true;
+    fabric.Object.prototype.lockScalingFlip = true;
 
-    // Hide middle-side controls to prevent confusion
+    // Premium Green Circle Controls
+    fabric.Object.prototype.cornerColor = '#4ade80';
+    fabric.Object.prototype.cornerStrokeColor = '#1a1b1e';
+    fabric.Object.prototype.transparentCorners = false;
+    fabric.Object.prototype.cornerSize = 10;
+    fabric.Object.prototype.cornerStyle = 'circle';
+    fabric.Object.prototype.borderColor = '#4ade80';
+    fabric.Object.prototype.borderScaleFactor = 1.5;
+
     fabric.Object.prototype.setControlsVisibility({
         mt: false, mb: false, ml: false, mr: false
     });
@@ -27,31 +32,52 @@ if (typeof fabric !== 'undefined') {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM Content Loaded - Initializing...');
     if (typeof fabric === 'undefined') {
-        console.error('Fabric.js not found! Ensure you have an internet connection for the CDN.');
-        alert('Fabric.jsの読み込みに失敗しました。インターネット接続を確認してください。');
+        alert('Fabric.jsの読み込みに失敗しました。');
         return;
     }
     initCanvas();
     setupEventListeners();
+    setupSidebarToggle();
+    setupZoomControls();
+    initEmojiPicker();
+
+    // Initial content
     addSpeechBubble();
+
+    // Initial centering
+    centerArtboard();
 });
 
 function initCanvas() {
+    const wrapper = document.getElementById('canvas-wrapper');
     canvas = new fabric.Canvas('canvas', {
-        width: WORK_WIDTH,
-        height: WORK_HEIGHT,
+        width: wrapper.clientWidth,
+        height: wrapper.clientHeight,
         backgroundColor: '#1a1b1e',
-        preserveObjectStacking: true
+        preserveObjectStacking: true,
+        selection: true
     });
+
+    // Handle Window Resize
+    window.addEventListener('resize', () => {
+        const wrapper = document.getElementById('canvas-wrapper');
+        canvas.setDimensions({
+            width: wrapper.clientWidth,
+            height: wrapper.clientHeight
+        });
+        // Optional: Re-center if desired, or just let the user pan
+        // centerArtboard(); 
+    });
+
     setupBasics();
 }
 
 function setupBasics() {
-    // Clear old ones if they exist (for safety during reset)
+    // Clear old UI elements
     const existing = canvas.getObjects().filter(o => ['artboard_bg', 'shroud_group', 'guide_border'].includes(o.name));
     existing.forEach(o => canvas.remove(o));
 
-    // Artboard background (Checkerboard for transparency visualization)
+    // Artboard background at (0,0)
     const checkerSize = 20;
     const checkerCanvas = document.createElement('canvas');
     checkerCanvas.width = checkerCanvas.height = checkerSize * 2;
@@ -66,8 +92,8 @@ function setupBasics() {
     const artboardBG = new fabric.Rect({
         width: CANVAS_SIZE,
         height: CANVAS_SIZE,
-        left: OFFSET_X,
-        top: OFFSET_Y,
+        left: 0,
+        top: 0,
         fill: new fabric.Pattern({ source: checkerCanvas, repeat: 'repeat' }),
         selectable: false,
         evented: false,
@@ -75,31 +101,29 @@ function setupBasics() {
     });
     canvas.add(artboardBG);
 
-    // Create Shroud (4 rectangles to dim the out-of-bounds area)
+    // Shroud (4 rectangles to dim the out-of-bounds area)
     const shroudStyle = {
-        fill: 'rgba(0, 0, 0, 0.6)',
-        selectable: false,
-        evented: false
-    };
-
-    const topShroud = new fabric.Rect({ ...shroudStyle, left: 0, top: 0, width: WORK_WIDTH, height: OFFSET_Y });
-    const bottomShroud = new fabric.Rect({ ...shroudStyle, left: 0, top: OFFSET_Y + CANVAS_SIZE, width: WORK_WIDTH, height: OFFSET_Y });
-    const leftShroud = new fabric.Rect({ ...shroudStyle, left: 0, top: OFFSET_Y, width: OFFSET_X, height: CANVAS_SIZE });
-    const rightShroud = new fabric.Rect({ ...shroudStyle, left: OFFSET_X + CANVAS_SIZE, top: OFFSET_Y, width: OFFSET_X, height: CANVAS_SIZE });
-
-    const shroudGroup = new fabric.Group([topShroud, bottomShroud, leftShroud, rightShroud], {
+        fill: 'rgba(0, 0, 0, 0.8)',
         selectable: false,
         evented: false,
-        name: 'shroud_group'
-    });
-    canvas.add(shroudGroup);
+        objectCaching: false,
+        name: 'shroud_item'
+    };
+    const EXTENT = 50000;
+
+    const topShroud = new fabric.Rect({ ...shroudStyle, left: -EXTENT, top: -EXTENT, width: EXTENT * 2 + CANVAS_SIZE, height: EXTENT });
+    const bottomShroud = new fabric.Rect({ ...shroudStyle, left: -EXTENT, top: CANVAS_SIZE, width: EXTENT * 2 + CANVAS_SIZE, height: EXTENT });
+    const leftShroud = new fabric.Rect({ ...shroudStyle, left: -EXTENT, top: 0, width: EXTENT, height: CANVAS_SIZE });
+    const rightShroud = new fabric.Rect({ ...shroudStyle, left: CANVAS_SIZE, top: 0, width: EXTENT, height: CANVAS_SIZE });
+
+    canvas.add(topShroud, bottomShroud, leftShroud, rightShroud);
 
     // Dotted border
     const guide = new fabric.Rect({
         width: CANVAS_SIZE,
         height: CANVAS_SIZE,
-        left: OFFSET_X,
-        top: OFFSET_Y,
+        left: 0,
+        top: 0,
         fill: 'transparent',
         stroke: '#4ade80',
         strokeWidth: 2,
@@ -111,8 +135,173 @@ function setupBasics() {
     canvas.add(guide);
 }
 
+function centerArtboard() {
+    const wrapper = document.getElementById('canvas-wrapper');
+    const zoom = 1; // Default zoom
+    currentZoom = zoom;
+
+    // Center point of artboard
+    const artboardCenter = { x: CANVAS_SIZE / 2, y: CANVAS_SIZE / 2 };
+
+    // Center point of canvas view
+    const viewCenter = { x: wrapper.clientWidth / 2, y: wrapper.clientHeight / 2 };
+
+    // Calculate viewport transform
+    // We want artboardCenter to be at viewCenter
+    const vpt = [zoom, 0, 0, zoom, viewCenter.x - artboardCenter.x * zoom, viewCenter.y - artboardCenter.y * zoom];
+
+    canvas.setViewportTransform(vpt);
+    updateZoomDisplay();
+}
+
+function setupZoomControls() {
+    // Buttons
+    document.getElementById('zoom-in').addEventListener('click', () => setZoom(currentZoom + 0.1));
+    document.getElementById('zoom-out').addEventListener('click', () => setZoom(currentZoom - 0.1));
+    document.getElementById('reset-view').addEventListener('click', centerArtboard);
+
+    // Mouse Wheel
+    canvas.on('mouse:wheel', function (opt) {
+        if (opt.e.ctrlKey || opt.e.metaKey) {
+            // System zoom fallback
+            return;
+        }
+
+        const delta = opt.e.deltaY;
+        let zoom = canvas.getZoom();
+        zoom *= 0.999 ** delta;
+        if (zoom > 5) zoom = 5;
+        if (zoom < 0.1) zoom = 0.1;
+
+        // Zoom to point
+        canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+        currentZoom = zoom;
+        updateZoomDisplay();
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+    });
+
+    // Panning State
+    let isDragging = false;
+    let isSpaceDown = false;
+    let lastPosX, lastPosY;
+
+    const wrapper = document.getElementById('canvas-wrapper');
+    // Native listener for middle-click (to reliably block autoscroll)
+    wrapper.addEventListener('mousedown', (e) => {
+        if (e.button === 1) {
+            e.preventDefault();
+            isDragging = true;
+            canvas.selection = false;
+            lastPosX = e.clientX;
+            lastPosY = e.clientY;
+            canvas.setCursor('grabbing');
+        }
+    }, { passive: false });
+
+    // Global Mouse Up to clear panning state even if released outside
+    window.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            canvas.selection = true;
+            canvas.setCursor(isSpaceDown ? 'grab' : 'default');
+            canvas.setViewportTransform(canvas.viewportTransform);
+        }
+    });
+
+    // Global Key Listeners for Space
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+            isSpaceDown = true;
+            canvas.defaultCursor = 'grab';
+            canvas.setCursor('grab');
+            if (e.target === document.body) e.preventDefault();
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+            isSpaceDown = false;
+            canvas.defaultCursor = 'default';
+            canvas.setCursor('default');
+        }
+    });
+
+    canvas.on('mouse:down', function (opt) {
+        const e = opt.e;
+        // Pan conditions: Space held OR Shift+Left Click
+        // Note: Middle click is started by the native wrapper listener
+        if (isSpaceDown || (e.button === 0 && e.shiftKey)) {
+            isDragging = true;
+            canvas.selection = false;
+            lastPosX = e.clientX;
+            lastPosY = e.clientY;
+            canvas.setCursor('grabbing');
+        }
+    });
+
+    canvas.on('mouse:move', function (opt) {
+        if (isDragging) {
+            const e = opt.e;
+            const vpt = canvas.viewportTransform;
+            vpt[4] += e.clientX - lastPosX;
+            vpt[5] += e.clientY - lastPosY;
+            canvas.requestRenderAll();
+            lastPosX = e.clientX;
+            lastPosY = e.clientY;
+            canvas.setCursor('grabbing');
+        } else if (isSpaceDown) {
+            canvas.setCursor('grab');
+        }
+    });
+
+    // mouse:up is redundant but safe to keep for Fabric events
+    canvas.on('mouse:up', function () {
+        if (isDragging) {
+            isDragging = false;
+            canvas.selection = true;
+            canvas.setCursor(isSpaceDown ? 'grab' : 'default');
+        }
+    });
+}
+
+function setZoom(val) {
+    if (val < 0.1) val = 0.1;
+    if (val > 5) val = 5;
+    currentZoom = val;
+    canvas.setZoom(val);
+    updateZoomDisplay();
+}
+
+function updateZoomDisplay() {
+    document.getElementById('zoom-level').textContent = Math.round(currentZoom * 100) + '%';
+}
+
+function setupSidebarToggle() {
+    const toggleBtn = document.getElementById('toggle-layer-panel');
+    const closeBtn = document.getElementById('close-layer-panel');
+    const panel = document.getElementById('layer-panel');
+
+    const openPanel = () => {
+        panel.classList.add('open');
+        toggleBtn.classList.add('hidden');
+    };
+
+    const closePanel = () => {
+        panel.classList.remove('open');
+        toggleBtn.classList.remove('hidden');
+    };
+
+    if (toggleBtn) toggleBtn.addEventListener('click', openPanel);
+    if (closeBtn) closeBtn.addEventListener('click', closePanel);
+
+    // Initially open?
+    openPanel();
+}
+
+
 function setupEventListeners() {
-    // Upload
+    // Upload - same logic but different positioning
     const uploadBtn = document.getElementById('upload-btn');
     const fileInput = document.getElementById('image-upload');
     if (uploadBtn) uploadBtn.addEventListener('click', () => fileInput.click());
@@ -121,141 +310,96 @@ function setupEventListeners() {
     // Text Input
     const textInput = document.getElementById('bubble-text');
     if (textInput) {
-        textInput.addEventListener('input', (e) => {
-            updateBubbleText(e.target.value);
+        textInput.addEventListener('input', (e) => updateBubbleText(e.target.value));
+    }
+
+    // Colors
+    const bgPick = document.getElementById('bg-color-picker');
+    const borderPick = document.getElementById('border-color-picker');
+    if (bgPick) bgPick.addEventListener('input', updateBubbleColors);
+    if (borderPick) borderPick.addEventListener('input', updateBubbleColors);
+
+    // Scale
+    const scaleInput = document.getElementById('bubble-scale');
+    const resetScale = document.getElementById('reset-bubble-scale');
+    if (scaleInput) {
+        scaleInput.addEventListener('input', (e) => {
+            if (currentBubbleGroup) {
+                currentBubbleGroup.scale(parseFloat(e.target.value));
+                canvas.renderAll();
+            }
+        });
+    }
+    if (resetScale) {
+        resetScale.addEventListener('click', () => {
+            if (currentBubbleGroup) {
+                currentBubbleGroup.scale(1.0);
+                if (scaleInput) scaleInput.value = 1.0;
+                canvas.renderAll();
+            }
         });
     }
 
-    // Opacity control
+    // Opacity
     const opacityInput = document.getElementById('layer-opacity');
     if (opacityInput) {
         opacityInput.addEventListener('input', (e) => {
-            const activeObject = canvas.getActiveObject();
-            if (activeObject) {
-                activeObject.set('opacity', e.target.value / 100);
+            const active = canvas.getActiveObject();
+            if (active) {
+                active.set('opacity', e.target.value / 100);
                 canvas.renderAll();
             }
         });
     }
 
-    // Color Pickers
-    const bgColorPicker = document.getElementById('bg-color-picker');
-    const borderOutlinePicker = document.getElementById('border-color-picker');
-    if (bgColorPicker) bgColorPicker.addEventListener('input', updateBubbleColors);
-    if (borderOutlinePicker) borderOutlinePicker.addEventListener('input', updateBubbleColors);
+    // Selection Events
+    canvas.on('selection:created', onSelectionChanged);
+    canvas.on('selection:updated', onSelectionChanged);
+    canvas.on('selection:cleared', onSelectionChanged);
 
-    // Bubble Scale
-    const bubbleScaleInput = document.getElementById('bubble-scale');
-    const resetBubbleScaleBtn = document.getElementById('reset-bubble-scale');
-
-    if (bubbleScaleInput) {
-        bubbleScaleInput.addEventListener('input', (e) => {
-            if (currentBubbleGroup) {
-                currentBubbleGroup.set({
-                    scaleX: parseFloat(e.target.value),
-                    scaleY: parseFloat(e.target.value)
-                });
-                canvas.renderAll();
-            }
-        });
-    }
-
-    if (resetBubbleScaleBtn) {
-        resetBubbleScaleBtn.addEventListener('click', () => {
-            if (currentBubbleGroup) {
-                currentBubbleGroup.set({
-                    scaleX: 1.0,
-                    scaleY: 1.0
-                });
-                if (bubbleScaleInput) bubbleScaleInput.value = 1.0;
-                canvas.renderAll();
-            }
-        });
-    }
-
-    // Layer list update events
+    // Objects Events
     canvas.on('object:added', updateLayerList);
     canvas.on('object:removed', updateLayerList);
     canvas.on('object:moved', updateLayerList);
-    canvas.on('object:scaling', (e) => {
-        const obj = e.target;
-        if (obj === currentBubbleGroup && bubbleScaleInput) {
-            bubbleScaleInput.value = obj.scaleX.toFixed(2);
-        }
-    });
 
-    canvas.on('selection:created', (e) => {
-        if (e.selected && e.selected[0]) {
-            const obj = e.selected[0];
-            if (opacityInput) opacityInput.value = (obj.opacity || 1) * 100;
-            if (obj === currentBubbleGroup && bubbleScaleInput) {
-                bubbleScaleInput.value = currentBubbleGroup.scaleX.toFixed(2);
-            }
-            // Update currentBubbleGroup if a bubble is selected
-            if (obj.type === 'group' && obj.item(1) instanceof fabric.Textbox) {
-                currentBubbleGroup = obj;
-            }
-        }
-        updateLayerList();
-    });
-    canvas.on('selection:updated', (e) => {
-        if (e.selected && e.selected[0]) {
-            const obj = e.selected[0];
-            if (opacityInput) opacityInput.value = (obj.opacity || 1) * 100;
-            if (obj === currentBubbleGroup && bubbleScaleInput) {
-                bubbleScaleInput.value = currentBubbleGroup.scaleX.toFixed(2);
-            }
-            // Update currentBubbleGroup if a bubble is selected
-            if (obj.type === 'group' && obj.item(1) instanceof fabric.Textbox) {
-                currentBubbleGroup = obj;
-            }
-        }
-        updateLayerList();
-    });
-    canvas.on('selection:cleared', updateLayerList);
+    // Save/Clear
+    document.getElementById('save-btn').addEventListener('click', saveCanvas);
+    document.getElementById('clear-btn').addEventListener('click', clearCanvas);
 
-    // Save
-    const saveBtn = document.getElementById('save-btn');
-    if (saveBtn) saveBtn.addEventListener('click', saveCanvas);
+    // Modify Add Bubble
+    const addBubble = document.getElementById('add-bubble-btn');
+    if (addBubble) addBubble.addEventListener('click', () => addSpeechBubble());
 
-    // Add Bubble button
-    const addBubbleBtn = document.getElementById('add-bubble-btn');
-    if (addBubbleBtn) addBubbleBtn.addEventListener('click', () => addSpeechBubble());
-
-    // Clear
-    const clearBtn = document.getElementById('clear-btn');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            if (!confirm('全てのレイヤーを削除してリセットしますか？')) return;
-
-            canvas.clear();
-            canvas.setBackgroundColor('#1a1b1e', canvas.renderAll.bind(canvas));
-
-            // Reset state
-            currentBubbleGroup = null;
-
-            // Reset DOM
-            if (textInput) textInput.value = "Hello!";
-            if (bubbleScaleInput) bubbleScaleInput.value = 1.0;
-            if (opacityInput) opacityInput.value = 100;
-
-            const bgPick = document.getElementById('bg-color-picker');
-            const borderPick = document.getElementById('border-color-picker');
-            if (bgPick) bgPick.value = "#3a4454";
-            if (borderPick) borderPick.value = "#3a4454";
-
-            setupBasics(); // Re-add workspace UI
-            addSpeechBubble();
-            updateLayerList();
-        });
+    // Rotation Reset
+    const resetRotationBtn = document.getElementById('reset-rotation-btn');
+    if (resetRotationBtn) {
+        resetRotationBtn.addEventListener('click', resetRotation);
     }
 }
 
-function keepUIOnTop() {
-    const shroudGroup = canvas.getObjects().find(o => o.name === 'shroud_group');
-    const guideBorder = canvas.getObjects().find(o => o.name === 'guide_border');
-    if (shroudGroup) canvas.bringToFront(shroudGroup);
-    if (guideBorder) canvas.bringToFront(guideBorder);
+function onSelectionChanged() {
+    const active = canvas.getActiveObject();
+    const opacityInput = document.getElementById('layer-opacity');
+    const scaleInput = document.getElementById('bubble-scale');
+
+    if (active) {
+        if (opacityInput) opacityInput.value = (active.opacity || 1) * 100;
+
+        // Identify bubble
+        let bubble = null;
+        if (active.type === 'group' && active.item(1) instanceof fabric.Textbox) {
+            bubble = active;
+        }
+
+        currentBubbleGroup = bubble;
+
+        if (bubble && scaleInput) {
+            scaleInput.value = bubble.scaleX.toFixed(2);
+        }
+    } else {
+        currentBubbleGroup = null;
+    }
+    updateLayerList();
 }
 
 function handleUpload(e) {
@@ -265,31 +409,26 @@ function handleUpload(e) {
     const reader = new FileReader();
     reader.onload = (f) => {
         fabric.Image.fromURL(f.target.result, (img) => {
-            const scale = Math.min(CANVAS_SIZE / img.width, CANVAS_SIZE / img.height) * 0.8;
+            // Fit to 400x400 max initially
+            const scale = Math.min(400 / img.width, 400 / img.height);
             img.scale(scale);
+
+            // Center in 512x512 with center origin
             img.set({
-                left: OFFSET_X + (CANVAS_SIZE - img.getScaledWidth()) / 2,
-                top: OFFSET_Y + (CANVAS_SIZE - img.getScaledHeight()) / 2,
-                cornerColor: '#4ade80',
-                cornerStrokeColor: '#1a1b1e',
-                transparentCorners: false,
-                cornerStyle: 'circle'
+                left: CANVAS_SIZE / 2,
+                top: CANVAS_SIZE / 2,
+                originX: 'center',
+                originY: 'center'
             });
 
             canvas.add(img);
-            canvas.sendToBack(img);
-
-            const artboardBG = canvas.getObjects().find(o => o.name === 'artboard_bg');
-            if (artboardBG) canvas.sendToBack(artboardBG);
-
             keepUIOnTop();
             canvas.setActiveObject(img);
             canvas.renderAll();
-            updateLayerList();
         });
     };
     reader.readAsDataURL(file);
-    e.target.value = ""; // Allow re-uploading same file
+    e.target.value = "";
 }
 
 function addSpeechBubble() {
@@ -297,7 +436,6 @@ function addSpeechBubble() {
     const defaultText = textElem ? textElem.value : "Hello!";
     const bgColor = document.getElementById('bg-color-picker').value;
     const borderColor = document.getElementById('border-color-picker').value;
-    const maxWidth = 380; // Standard max width
 
     const r = parseInt(bgColor.slice(1, 3), 16);
     const g = parseInt(bgColor.slice(3, 5), 16);
@@ -309,9 +447,11 @@ function addSpeechBubble() {
         fill: '#ffffff',
         fontFamily: 'Noto Sans JP',
         selectable: false,
-        width: maxWidth,
+        width: 380,
         textAlign: 'center',
-        splitByGrapheme: true
+        splitByGrapheme: true,
+        originX: 'center',
+        originY: 'center'
     });
 
     const rect = new fabric.Rect({
@@ -320,28 +460,28 @@ function addSpeechBubble() {
         strokeWidth: 1.5,
         rx: CORNER_RADIUS,
         ry: CORNER_RADIUS,
-        selectable: false
+        selectable: false,
+        originX: 'center',
+        originY: 'center'
     });
 
+    // Initial grouping - center of Artboard
     const group = new fabric.Group([rect, text], {
-        left: OFFSET_X + CANVAS_SIZE / 2,
-        top: OFFSET_Y + 100,
+        left: CANVAS_SIZE / 2,
+        top: CANVAS_SIZE / 2 + 50,
         originX: 'center',
         originY: 'center',
         selectable: true,
-        hasControls: true
     });
 
-    // Disable rotation for bubble as we want it upright usually
-    group.setControlsVisibility({ mtr: false });
-
     currentBubbleGroup = group;
-    updateBubbleDesign();
+    // Trick: we need to add to canvas to calculate bounds correctly for updateBubbleDesign
     canvas.add(group);
+
+    updateBubbleDesign(); // Correct sizes
     keepUIOnTop();
     canvas.setActiveObject(group);
     canvas.renderAll();
-    updateLayerList();
 }
 
 function updateBubbleText(val) {
@@ -356,97 +496,162 @@ function updateBubbleDesign() {
     const rect = currentBubbleGroup.item(0);
     const text = currentBubbleGroup.item(1);
 
-    let actualMaxLineWidth = 0;
-    const lineCount = text._textLines.length;
-    for (let i = 0; i < lineCount; i++) {
-        const lineWidth = text.getLineWidth(i);
-        if (lineWidth > actualMaxLineWidth) {
-            actualMaxLineWidth = lineWidth;
-        }
+    // We used origin center, so calculations are relative to center
+    // However, text layout needs width check
+    let maxW = 0;
+    const lines = text._textLines.length;
+    for (let i = 0; i < lines; i++) {
+        const w = text.getLineWidth(i);
+        if (w > maxW) maxW = w;
     }
 
-    const textWidth = actualMaxLineWidth;
-    const textHeight = text.getScaledHeight();
-    const bgWidth = textWidth + BUBBLE_PADDING * 2;
-    const bgHeight = textHeight + BUBBLE_PADDING * 2;
+    const w = maxW + BUBBLE_PADDING * 2;
+    const h = text.getScaledHeight() + BUBBLE_PADDING * 2;
 
-    rect.set({
-        width: bgWidth,
-        height: bgHeight,
-        left: -bgWidth / 2,
-        top: -bgHeight / 2
-    });
+    rect.set({ width: w, height: h });
+    // Text is already centered in group
 
-    text.set({
-        left: -text.getScaledWidth() / 2,
-        top: -textHeight / 2
-    });
-
-    currentBubbleGroup.set({
-        width: bgWidth,
-        height: bgHeight
-    });
-
-    currentBubbleGroup.setCoords();
+    // Force Group update
+    currentBubbleGroup.addWithUpdate();
     canvas.renderAll();
 }
 
-function updateLayerList() {
-    const listContainer = document.getElementById('layer-list');
-    if (!listContainer) return;
-    listContainer.innerHTML = '';
+function updateBubbleColors() {
+    if (!currentBubbleGroup) return;
+    const bgColor = document.getElementById('bg-color-picker').value;
+    const borderColor = document.getElementById('border-color-picker').value;
 
-    const objects = canvas.getObjects().filter(o =>
-        !['shroud_group', 'guide_border', 'artboard_bg'].includes(o.name)
+    const r = parseInt(bgColor.slice(1, 3), 16);
+    const g = parseInt(bgColor.slice(3, 5), 16);
+    const b = parseInt(bgColor.slice(5, 7), 16);
+    const rgbaBg = `rgba(${r}, ${g}, ${b}, 0.9)`;
+
+    currentBubbleGroup.item(0).set({
+        fill: rgbaBg,
+        stroke: borderColor === bgColor ? null : borderColor
+    });
+    canvas.renderAll();
+}
+
+function addShape(type) {
+    let shape;
+    // Map of specific default colors for each decoration type
+    const defaultColors = {
+        'star': '#fcc419',   // Gold/Yellow
+        'heart': '#ff8787',  // Pink
+        'sparkle': '#a5d8ff' // Sky Blue
+    };
+    const color = defaultColors[type] || '#ffffff';
+
+    if (type === 'star') {
+        // 5-point star construction
+        const points = [];
+        const num = 5;
+        for (let i = 0; i < num * 2; i++) {
+            const r = (i % 2 === 0) ? 30 : 15;
+            const a = (i * Math.PI) / num;
+            points.push({ x: r * Math.sin(a), y: -r * Math.cos(a) });
+        }
+        shape = new fabric.Polygon(points, { fill: color, name: 'deco_star' });
+    } else if (type === 'heart') {
+        const path = "M 272 238 C 206 238 152 292 152 358 C 152 493 288 528 381 662 C 468 524 609 490 609 358 C 609 292 556 238 489 238 C 441 238 400 267 381 307 C 362 267 320 238 272 238 z";
+        shape = new fabric.Path(path, { fill: color, scaleX: 0.15, scaleY: 0.15, name: 'deco_heart' });
+    } else if (type === 'sparkle') {
+        const points = [];
+        const num = 4;
+        for (let i = 0; i < num * 2; i++) {
+            const r = (i % 2 === 0) ? 30 : 6;
+            const a = (i * Math.PI) / num;
+            points.push({ x: r * Math.sin(a), y: -r * Math.cos(a) });
+        }
+        shape = new fabric.Polygon(points, { fill: color, name: 'deco_sparkle' });
+    }
+
+    if (shape) {
+        shape.set({
+            left: CANVAS_SIZE / 2,
+            top: CANVAS_SIZE / 2,
+            originX: 'center',
+            originY: 'center',
+            cornerColor: '#4ade80',
+            transparentCorners: false,
+            cornerStyle: 'circle'
+        });
+        canvas.add(shape);
+        keepUIOnTop();
+        canvas.setActiveObject(shape);
+    }
+}
+
+function keepUIOnTop() {
+    const ui = canvas.getObjects().filter(o => ['shroud_item', 'guide_border'].includes(o.name));
+    ui.forEach(o => o.bringToFront());
+}
+
+function updateLayerList() {
+    const container = document.getElementById('layer-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Reverse order for UI (Top layer first)
+    // Filter out UI elements
+    const layers = canvas.getObjects().filter(o =>
+        !['shroud_item', 'guide_border', 'artboard_bg'].includes(o.name)
     ).reverse();
 
-    const activeObject = canvas.getActiveObject();
+    const active = canvas.getActiveObject();
 
-    objects.forEach((obj) => {
-        const actualIndex = canvas.getObjects().indexOf(obj);
-        const item = document.createElement('div');
-        item.className = 'layer-item' + (activeObject === obj ? ' active' : '');
+    layers.forEach(obj => {
+        const idx = canvas.getObjects().indexOf(obj); // Real index
+        const div = document.createElement('div');
+        div.className = 'layer-item' + (active === obj ? ' active' : '');
 
-        let name = obj.name || "オブジェクト";
+        // Extract counter if exists in obj.name (e.g. "Name (2)")
+        let counter = "";
+        if (obj.name) {
+            const match = obj.name.match(/ \((\d+)\)$/);
+            if (match) counter = ` (${match[1]})`;
+        }
+
+        // Name generation & Decoration check
+        let name = "Object";
         let isDeco = false;
-
-        // Determine display name and deco status
-        if (obj.type === 'image' && !obj.name) name = "画像";
 
         if (obj.name && obj.name.includes('deco_')) {
             isDeco = true;
-            name = obj.name
-                .replace('deco_star', 'デコ: 星')
-                .replace('deco_heart', 'デコ: ハート')
-                .replace('deco_sparkle', 'デコ: キラキラ');
-        }
-
-        if (obj.type === 'group' || obj.type === 'textbox') {
-            const textItem = obj.type === 'group' ? obj.item(1) : obj;
-            const textSource = textItem ? textItem.text : "";
-            const bubbleLabel = "吹き出し: " + (textSource.substring(0, 10) + (textSource.length > 10 ? "..." : ""));
-            // For bubbles, we always show text content, but can append copy number if it exists in obj.name
-            const match = obj.name ? obj.name.match(/ \((\d+)\)$/) : null;
-            name = bubbleLabel + (match ? match[0] : "");
+            const typeLabel = obj.name.includes('star') ? '★ Star' : obj.name.includes('heart') ? '♥ Heart' : '✨ Sparkle';
+            name = typeLabel + counter;
+        } else if (obj.name && obj.name.includes('emoji_')) {
+            isDeco = false; // No color picker for emojis
+            name = `😀 ${obj.text}` + counter;
+        } else if (obj.type === 'image') {
+            name = '🖼 Image' + counter;
+        } else if (obj.type === 'group' && obj.item(1)) {
+            const text = obj.item(1).text;
+            name = `💬 ${text.substring(0, 8)}${text.length > 8 ? '...' : ''}` + counter;
+        } else {
+            // Fallback for generic objects
+            name = (obj.name || "Object") + (obj.name && obj.name.includes('(') ? "" : counter);
         }
 
         const colorPickerHTML = isDeco ? `
-            <input type="color" value="${obj.fill}" class="layer-color-picker" title="色を変更">
+            <input type="color" value="${obj.fill}" class="layer-color-picker" title="色を変更" style="width:20px; height:20px; border:none; padding:0; background:none; cursor:pointer;">
         ` : '';
 
-        item.innerHTML = `
+        div.innerHTML = `
             <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
                 ${colorPickerHTML}
                 <span>${name}</span>
             </div>
             <div class="layer-controls">
-                <button onclick="cloneLayerByObjIndex(${actualIndex})" title="複製" style="background-color: #228be6;">📄</button>
-                <button onclick="deleteLayerByObjIndex(${actualIndex})" title="削除" style="background-color: #fa5252;">✕</button>
+                <button onclick="cloneLayer(${idx})">📄</button>
+                <button onclick="deleteLayer(${idx})" style="background-color: #fa5252;">✕</button>
             </div>
         `;
 
+        // Event Listeners for Color Picker
         if (isDeco) {
-            const picker = item.querySelector('.layer-color-picker');
+            const picker = div.querySelector('.layer-color-picker');
             picker.addEventListener('input', (e) => {
                 obj.set('fill', e.target.value);
                 canvas.renderAll();
@@ -454,56 +659,90 @@ function updateLayerList() {
             picker.addEventListener('click', (e) => e.stopPropagation());
         }
 
-        // Drag and Drop implementation
-        item.setAttribute('draggable', true);
-        item.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', actualIndex);
-            item.classList.add('dragging');
-        });
-        item.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            item.classList.add('drag-over');
-        });
-        item.addEventListener('dragleave', () => {
-            item.classList.remove('drag-over');
-        });
-        item.addEventListener('dragend', () => {
-            item.classList.remove('dragging');
-            const allItems = listContainer.querySelectorAll('.layer-item');
-            allItems.forEach(i => i.classList.remove('drag-over'));
-        });
-        item.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
-            const targetIndex = actualIndex;
-            if (sourceIndex !== targetIndex) {
-                const sourceObj = canvas.getObjects()[sourceIndex];
-                if (sourceObj) {
-                    canvas.moveTo(sourceObj, targetIndex);
-                    keepUIOnTop();
-                    canvas.renderAll();
-                    updateLayerList();
-                }
+        div.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON' && !e.target.classList.contains('layer-color-picker')) {
+                canvas.setActiveObject(obj);
+                canvas.renderAll();
             }
         });
 
-        item.addEventListener('click', (e) => {
-            if (e.target.closest('.layer-controls') || e.target.closest('.layer-color-picker')) return;
-            canvas.setActiveObject(obj);
-            canvas.renderAll();
+        // Setup Drag & Drop (simplified for brevity)
+        div.draggable = true;
+        div.addEventListener('dragstart', (e) => { e.dataTransfer.setData('idx', idx); div.classList.add('dragging'); });
+        div.addEventListener('dragend', () => div.classList.remove('dragging'));
+        div.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const srcIdx = parseInt(e.dataTransfer.getData('idx'));
+            if (srcIdx !== idx) {
+                canvas.moveTo(canvas.getObjects()[srcIdx], idx);
+                keepUIOnTop();
+                updateLayerList();
+            }
         });
-        listContainer.appendChild(item);
+        div.addEventListener('dragover', e => e.preventDefault());
+
+        container.appendChild(div);
     });
 }
 
-window.cloneLayerByObjIndex = function (index) {
+function clearCanvas() {
+    if (!confirm('リセットしますか？')) return;
+    canvas.clear();
+    canvas.setBackgroundColor('#1a1b1e');
+    setupBasics();
+    addSpeechBubble();
+    updateLayerList();
+}
+
+function saveCanvas() {
+    canvas.discardActiveObject();
+
+    // Backup current viewport state
+    const originalVpt = [...canvas.viewportTransform];
+
+    // Hide UI elements
+    const ui = canvas.getObjects().filter(o => ['shroud_item', 'guide_border', 'artboard_bg'].includes(o.name));
+    ui.forEach(o => o.visible = false);
+
+    // Reset zoom/pan for export to ensure (0,0, 512,512) is the artboard
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    canvas.renderAll();
+
+    const sizeSelect = document.getElementById('export-size');
+    const size = sizeSelect ? parseInt(sizeSelect.value) : 512;
+    const mult = size / CANVAS_SIZE;
+
+    // Export 0,0, 512,512 (Artboard area)
+    const data = canvas.toDataURL({
+        left: 0,
+        top: 0,
+        width: CANVAS_SIZE,
+        height: CANVAS_SIZE,
+        format: 'png',
+        multiplier: mult
+    });
+
+    // Restore UI and Viewport
+    ui.forEach(o => o.visible = true);
+    canvas.setViewportTransform(originalVpt);
+    canvas.renderAll();
+
+    // Trigger download
+    const a = document.createElement('a');
+    a.href = data;
+    a.download = `vrc_sticker_${size}.png`;
+    a.click();
+}
+
+// Global exposure for HTML inline clicks
+window.addShape = addShape;
+window.cloneLayer = function (idx) {
     const objects = canvas.getObjects();
-    const obj = objects[index];
+    const obj = objects[idx];
     if (!obj) return;
 
     // Prevent cloning UI elements
-    if (['shroud_group', 'guide_border', 'artboard_bg'].includes(obj.name)) {
-        console.warn("UI elements cannot be cloned.");
+    if (['shroud_item', 'guide_border', 'artboard_bg'].includes(obj.name)) {
         return;
     }
 
@@ -512,6 +751,12 @@ window.cloneLayerByObjIndex = function (index) {
 
         // Handle naming
         let baseName = obj.name || (obj.type === 'image' ? "画像" : (obj.type === 'group' ? "吹き出し" : "オブジェクト"));
+
+        // Simple heuristic for unnamed bubbles
+        if (!obj.name && obj.type === 'group' && obj.item(1)) {
+            baseName = "吹き出し";
+        }
+
         const match = baseName.match(/(.+) \((\d+)\)$/);
         let newName;
         if (match) {
@@ -533,139 +778,92 @@ window.cloneLayerByObjIndex = function (index) {
             cloned.setCoords();
         } else {
             // Insert exactly above the original
-            canvas.insertAt(cloned, index + 1);
+            canvas.insertAt(cloned, idx + 1);
         }
 
         canvas.setActiveObject(cloned);
         keepUIOnTop();
         canvas.renderAll();
+        // Force update to reflect new order
         updateLayerList();
     });
 };
 
-window.deleteLayerByObjIndex = function (index) {
-    const objects = canvas.getObjects();
-    const obj = objects[index];
-    if (!obj) return;
+function initEmojiPicker() {
+    const emojis = [
+        // Faces
+        "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾",
+        // Hearts & Symbols
+        "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "✨", "🌟", "⭐", "💫", "🔥", "💥", "💢", "💦", "💨", "❗", "❓", "❕", "❔", "⚠️", "🚩", "🏁", "🎯", "🎵", "🎶", "💬", "💭", "🗯", "💤", "🔔", "⭐", "💮", "💯",
+        // Hands & Objects
+        "🙏", "🤲", "👐", "🙌", "👏", "🤝", "👍", "👎", "👊", "✊", "🤛", "🤜", "🤞", "✌️", "🤟", "🤘", "👌", "👈", "👉", "👆", "👇", "✋", "🤚", "🖐", "🖖", "👋", "🤙", "💪", "🤳", "💅", "💎", "💍", "🎁", "🎈", "🎉", "🎊", "🎀", "🧧", "🧿", "🩹", "🩺", "🎨", "🎭", "🎮", "🕹", "📱", "💻", "📷", "📸", "💡", "🔦", "🕯", "🧹", "🧺", "🧼", "🪒", "🧴",
+        // Nature & Animals
+        "🌸", "🏵️", "🌹", "🌺", "🌻", "🌼", "🌷", "🌱", "🌲", "🌳", "🌴", "🌵", "🌿", "🍀", "☘️", "🍂", "🍁", "🍄", "🐚", "🌑", "🌒", "🌓", "🌔", "🌕", "🌙", "🌍", "🌈", "☀️", "☁️", "⛈️", "❄️", "⛄", "🌊", "🐱", "🐶", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐒", "🐔", "🐧", "🐦", "🐤", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🦗", "🕷", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈",
+        // Food & Drink
+        "🍔", "🍟", "🍕", "🥗", "🥪", "🌮", "🌯", "🍜", "🍣", "🍱", "🥟", "🍤", "🍙", "🍚", "🍛", "🍢", "🍳", "🥖", "🥐", "🥨", "🥞", "🧇", "🧀", "🥩", "🍗", "🍖", "🥦", "🌽", "🥕", "🍓", "🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🥝", "🫐", "🍒", "🍑", "🥭", "🍍", "🥥", "🍿", "🍩", "🍪", "🎂", "🍰", "🧁", "🥧", "🍫", "🍬", "🍭", "🍦", "🍧", "🍨", "🍵", "☕", "🥛", "🥤", "🧋", "🍶", "🍺", "🍻", "🥂", "🍷", "🥃", "🍸", "🍹"
+    ];
 
-    canvas.remove(obj);
-    if (obj === currentBubbleGroup) currentBubbleGroup = null;
+    const picker = document.getElementById('emoji-picker');
+    const list = document.getElementById('emoji-list');
+    const openBtn = document.getElementById('add-emoji-btn');
+    const closeBtn = document.getElementById('close-emoji-picker');
 
+    if (!list || !openBtn || !closeBtn) return;
+
+    emojis.forEach(char => {
+        const btn = document.createElement('button');
+        btn.className = 'emoji-item';
+        btn.innerText = char;
+        btn.onclick = () => {
+            addEmoji(char);
+            picker.classList.add('hidden');
+        };
+        list.appendChild(btn);
+    });
+
+    openBtn.onclick = () => picker.classList.toggle('hidden');
+    closeBtn.onclick = () => picker.classList.add('hidden');
+}
+
+async function addEmoji(char) {
+    // Ensure font is loaded
+    try {
+        await document.fonts.load('1em Noto Color Emoji');
+    } catch (e) {
+        console.warn('Emoji font load failed, falling back to OS.', e);
+    }
+
+    const emoji = new fabric.Text(char, {
+        left: CANVAS_SIZE / 2,
+        top: CANVAS_SIZE / 2,
+        fontSize: 100,
+        fontFamily: "'Noto Color Emoji', sans-serif",
+        originX: 'center',
+        originY: 'center',
+        name: 'emoji_' + char
+    });
+
+    canvas.add(emoji);
+    canvas.setActiveObject(emoji);
+    keepUIOnTop();
     canvas.renderAll();
     updateLayerList();
-};
+}
 
-
-window.addShape = function (type) {
-    let shape;
-    const color = document.getElementById('bg-color-picker').value;
-
-    if (type === 'star') {
-        // 5-point star
-        const points = [];
-        const numPoints = 5;
-        const outRadius = 30;
-        const innerRadius = 15;
-        for (let i = 0; i < numPoints * 2; i++) {
-            const r = (i % 2 === 0) ? outRadius : innerRadius;
-            const a = (i * Math.PI) / numPoints;
-            points.push({ x: r * Math.sin(a), y: -r * Math.cos(a) });
-        }
-        shape = new fabric.Polygon(points, {
-            fill: color,
-            name: 'deco_star'
-        });
-    } else if (type === 'heart') {
-        const path = "M 272.70141,238.71731 C 206.46141,238.71731 152.70141,292.47731 152.70141,358.71731 C 152.70141,493.47282 288.63461,528.80461 381.26381,662.02535 C 468.83811,524.97599 609.82611,490.11135 609.82611,358.71731 C 609.82611,292.47731 556.06611,238.71731 489.82611,238.71731 C 441.77851,238.71731 400.42481,267.08774 381.26381,307.90481 C 362.10281,267.08774 320.74911,238.71731 272.70141,238.71731 z ";
-        shape = new fabric.Path(path, {
-            fill: color,
-            scaleX: 0.15,
-            scaleY: 0.15,
-            name: 'deco_heart'
-        });
-    } else if (type === 'sparkle') {
-        const points = [];
-        const numPoints = 4;
-        const outRadius = 30;
-        const innerRadius = 6;
-        for (let i = 0; i < numPoints * 2; i++) {
-            const r = (i % 2 === 0) ? outRadius : innerRadius;
-            const a = (i * Math.PI) / numPoints;
-            points.push({ x: r * Math.sin(a), y: -r * Math.cos(a) });
-        }
-        shape = new fabric.Polygon(points, {
-            fill: color,
-            name: 'deco_sparkle'
-        });
-    }
-
-    if (shape) {
-        shape.set({
-            left: OFFSET_X + CANVAS_SIZE / 2,
-            top: OFFSET_Y + CANVAS_SIZE / 2,
-            originX: 'center',
-            originY: 'center',
-            cornerColor: '#4ade80',
-            cornerStyle: 'circle',
-            transparentCorners: false,
-            hasControls: true
-        });
-        // Explicitly ensure rotation is visible (mtr)
-        shape.setControlsVisibility({ mtr: true });
-
-        canvas.add(shape);
-        canvas.setActiveObject(shape);
-        keepUIOnTop();
+function resetRotation() {
+    const active = canvas.getActiveObject();
+    if (active) {
+        active.set('angle', 0);
+        active.setCoords();
         canvas.renderAll();
+    }
+}
+
+window.deleteLayer = function (idx) {
+    const obj = canvas.getObjects()[idx];
+    if (obj) {
+        canvas.remove(obj);
+        keepUIOnTop();
         updateLayerList();
     }
 };
-
-function updateBubbleColors() {
-    const bgColor = document.getElementById('bg-color-picker').value;
-    const borderColor = document.getElementById('border-color-picker').value;
-
-    const r = parseInt(bgColor.slice(1, 3), 16);
-    const g = parseInt(bgColor.slice(3, 5), 16);
-    const b = parseInt(bgColor.slice(5, 7), 16);
-    const rgbaBg = `rgba(${r}, ${g}, ${b}, 0.9)`;
-
-    if (!currentBubbleGroup) return;
-
-    const rect = currentBubbleGroup.item(0);
-    rect.set({
-        fill: rgbaBg,
-        stroke: borderColor === bgColor ? null : borderColor,
-    });
-    canvas.renderAll();
-}
-
-function saveCanvas() {
-    canvas.discardActiveObject();
-    const uiElements = canvas.getObjects().filter(o => ['shroud_group', 'guide_border', 'artboard_bg'].includes(o.name));
-    uiElements.forEach(el => el.set('visible', false));
-    canvas.renderAll();
-
-    // Calculate multiplier based on selected export size
-    const exportSizeSelect = document.getElementById('export-size');
-    const targetSize = exportSizeSelect ? parseInt(exportSizeSelect.value) : 512;
-    const exportMultiplier = targetSize / CANVAS_SIZE;
-
-    const dataURL = canvas.toDataURL({
-        format: 'png',
-        quality: 1.0,
-        left: OFFSET_X,
-        top: OFFSET_Y,
-        width: CANVAS_SIZE,
-        height: CANVAS_SIZE,
-        multiplier: exportMultiplier
-    });
-
-    uiElements.forEach(el => el.set('visible', true));
-    canvas.renderAll();
-
-    const link = document.createElement('a');
-    link.download = `vrc_sticker_${targetSize}px.png`;
-    link.href = dataURL;
-    link.click();
-}

@@ -7,106 +7,162 @@
     <title>VRC Sticker Maker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Color+Emoji&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=1.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 </head>
 
 <body>
     <div id="app">
-        <aside class="sidebar">
-            <h1>VRC Sticker Maker</h1>
+        <!-- LEFT SIDEBAR: Creation Tools + Save -->
+        <aside class="sidebar-left">
+            <div class="sidebar-content">
+                <h1>VRC Sticker Maker</h1>
 
-            <div class="control-group">
-                <label for="image-upload">画像をアップロード</label>
-                <input type="file" id="image-upload" accept="image/png, image/jpeg" style="display: none;">
-                <button id="upload-btn">画像を選択</button>
-            </div>
+                <!-- Input Group -->
+                <div class="control-group">
+                    <label for="image-upload">画像をアップロード</label>
+                    <input type="file" id="image-upload" accept="image/png, image/jpeg" style="display: none;">
+                    <button id="upload-btn">画像を選択</button>
+                </div>
 
-            <div class="control-group">
-                <label for="bubble-text">テキスト入力</label>
-                <input type="text" id="bubble-text" placeholder="メッセージを入力..." value="Hello!">
-            </div>
+                <div class="control-group">
+                    <label for="bubble-text">テキスト入力</label>
+                    <input type="text" id="bubble-text" placeholder="メッセージを入力..." value="Hello!">
+                </div>
 
-
-            <div class="control-group">
-                <label>吹き出し配色</label>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 0.25rem;">
-                        <span style="font-size: 0.7rem; color: #adb5bd;">背景</span>
-                        <input type="color" id="bg-color-picker" value="#3a4454"
-                            style="width: 100%; height: 30px; border: none; padding: 0;">
+                <!-- Bubble Settings -->
+                <div class="control-group">
+                    <label>吹き出し配色</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <span style="font-size: 0.7rem; color: #adb5bd;">背景</span>
+                            <input type="color" id="bg-color-picker" value="#3a4454"
+                                style="width: 100%; height: 30px; border: none; padding: 0;">
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <span style="font-size: 0.7rem; color: #adb5bd;">枠線 (なしは背景と同色)</span>
+                            <input type="color" id="border-color-picker" value="#3a4454"
+                                style="width: 100%; height: 30px; border: none; padding: 0;">
+                        </div>
                     </div>
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 0.25rem;">
-                        <span style="font-size: 0.7rem; color: #adb5bd;">枠線 (なしは背景と同色)</span>
-                        <input type="color" id="border-color-picker" value="#3a4454"
-                            style="width: 100%; height: 30px; border: none; padding: 0;">
+                </div>
+
+                <div class="control-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label for="bubble-scale">吹き出しの大きさ</label>
+                        <button id="reset-bubble-scale" class="secondary"
+                            style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">リセット</button>
+                    </div>
+                    <input type="range" id="bubble-scale" min="0.5" max="2" step="0.1" value="1.0" style="width: 100%;">
+                </div>
+
+                <!-- Add Objects -->
+                <div class="control-group">
+                    <label>コンポーネント追加</label>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button id="add-bubble-btn" class="secondary"
+                            style="width: 100%; margin-bottom: 0.5rem; padding: 0.5rem;">💭 吹き出しを追加</button>
+                        <button id="add-emoji-btn" class="secondary"
+                            style="width: 100%; margin-bottom: 0.5rem; padding: 0.5rem;">😀 絵文字を追加</button>
+                        <button class="secondary" onclick="addShape('star')" style="flex: 1; padding: 0.5rem;">⭐
+                            星</button>
+                        <button class="secondary" onclick="addShape('heart')" style="flex: 1; padding: 0.5rem;">❤️
+                            ハート</button>
+                        <button class="secondary" onclick="addShape('sparkle')" style="flex: 1; padding: 0.5rem;">✨
+                            輝き</button>
                     </div>
                 </div>
             </div>
 
-
-            <div class="control-group">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <label for="bubble-scale">吹き出しの大きさ</label>
-                    <button id="reset-bubble-scale" class="secondary"
-                        style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">リセット</button>
+            <!-- Fixed Footer in Left Sidebar -->
+            <div class="sidebar-footer">
+                <div class="control-group">
+                    <label for="export-size">書き出し解像度</label>
+                    <select id="export-size"
+                        style="background-color: #1a1b1e; border: 1px solid var(--border-color); color: white; padding: 0.5rem; border-radius: 8px; width: 100%;">
+                        <option value="512">512 x 512 (標準)</option>
+                        <option value="1024">1024 x 1024 (高画質)</option>
+                    </select>
                 </div>
-                <input type="range" id="bubble-scale" min="0.5" max="2" step="0.1" value="1.0" style="width: 100%;">
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                    <button id="save-btn" style="flex: 2;">スタンプを保存</button>
+                    <button id="clear-btn" class="secondary" style="flex: 1;">リセット</button>
+                </div>
+                <div class="legal-info">
+                    <p><strong>VRChat 非公式コミュニティツール</strong></p>
+                    <p>当ツールは有志による開発プロジェクトであり、VRChat公式とは一切関係ありません。</p>
+                    <p class="credits">
+                        Powered by <a href="https://fabricjs.com/" target="_blank">Fabric.js</a><br>
+                        Emoji: <a href="https://fonts.google.com/noto/specimen/Noto+Color+Emoji" target="_blank">Noto
+                            Color Emoji</a> (Apache 2.0)<br>
+                        Fonts: <a href="https://fonts.google.com/" target="_blank">Google Fonts</a>
+                    </p>
+                    <p class="disclaimer">利用により生じた損害等について開発者は一切責任を負いません。法令や公序良俗に反する利用はお控えください。</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER: Workspace -->
+        <main class="main-content">
+            <div class="canvas-controls">
+                <div class="nav-help">
+                    <span><b>移動:</b> Space+ドラッグ / ホイールクリック</span>
+                    <span><b>ズーム:</b> Wheel / +/-</span>
+                </div>
+                <div class="zoom-controls">
+                    <button id="zoom-out" class="icon-btn">-</button>
+                    <span id="zoom-level">100%</span>
+                    <button id="zoom-in" class="icon-btn">+</button>
+                    <button id="reset-view" class="icon-btn">Fit</button>
+                </div>
+            </div>
+            <div class="canvas-container-wrapper" id="canvas-wrapper">
+                <canvas id="canvas"></canvas>
+            </div>
+
+            <!-- Emoji Picker Overlay -->
+            <div id="emoji-picker" class="emoji-picker hidden">
+                <div class="emoji-picker-header">
+                    <span>絵文字を選択</span>
+                    <button id="close-emoji-picker">✕</button>
+                </div>
+                <div id="emoji-list" class="emoji-list">
+                    <!-- Emojis will be injected here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT TOGGLE BUTTON -->
+        <button id="toggle-layer-panel" class="layer-toggle-btn" title="レイヤーパネルを表示/非表示">
+            ◀ レイヤー
+        </button>
+
+        <!-- RIGHT SIDEBAR: Layer Management (Collapsible) -->
+        <aside class="sidebar-right" id="layer-panel">
+            <div class="sidebar-header">
+                <h2>レイヤー設定</h2>
+                <button id="close-layer-panel" class="icon-btn">✕</button>
             </div>
 
             <div class="control-group">
-                <label for="layer-opacity">不透明度 (選択中のレイヤー)</label>
+                <label for="layer-opacity">不透明度</label>
                 <input type="range" id="layer-opacity" min="0" max="100" value="100" style="width: 100%;">
             </div>
 
-            <div class="control-group">
-                <label>コンポーネント追加</label>
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <button id="add-bubble-btn" class="secondary"
-                        style="width: 100%; margin-bottom: 0.5rem; padding: 0.5rem;">💭 吹き出しを追加</button>
-                    <button class="secondary" onclick="addShape('star')" style="flex: 1; padding: 0.5rem;">⭐ 星</button>
-                    <button class="secondary" onclick="addShape('heart')" style="flex: 1; padding: 0.5rem;">❤️
-                        ハート</button>
-                    <button class="secondary" onclick="addShape('sparkle')" style="flex: 1; padding: 0.5rem;">✨
-                        輝き</button>
-                </div>
+            <div class="control-group" style="margin-top: 0.25rem; margin-bottom: 0.5rem;">
+                <button id="reset-rotation-btn" class="secondary"
+                    style="width: 100%; padding: 0.5rem; font-size: 0.8rem;">🔄 回転をリセット</button>
             </div>
 
-            <div class="control-group">
+            <div class="control-group" style="flex: 1; display: flex; flex-direction: column;">
                 <label>レイヤー (ドラッグして順序変更)</label>
                 <div id="layer-list" class="layer-list">
                     <!-- Layers will be injected here -->
                 </div>
             </div>
-
-            <div class="control-group">
-                <label for="export-size">書き出し解像度</label>
-                <select id="export-size"
-                    style="background-color: #1a1b1e; border: 1px solid var(--border-color); color: white; padding: 0.5rem; border-radius: 8px;">
-                    <option value="512">512 x 512 (標準)</option>
-                    <option value="1024">1024 x 1024 (高画質)</option>
-                </select>
-            </div>
-
-            <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem;">
-                <button id="save-btn">スタンプを保存</button>
-                <button id="clear-btn" class="secondary">リセット</button>
-            </div>
-
-            <div
-                style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #373a40; font-size: 0.65rem; color: #909296; line-height: 1.4;">
-                <p>※ 本ツールは非公式のコミュニティプロジェクトであり、VRChat Inc.とは関係ありません。</p>
-                <p>※ This is an unofficial community tool and not affiliated with VRChat Inc.</p>
-            </div>
         </aside>
-
-        <main class="main-content">
-            <div class="canvas-container-wrapper">
-                <div id="canvas-info">Workspace(Transparent PNG)</div>
-                <canvas id="canvas"></canvas>
-            </div>
-        </main>
     </div>
     <script src="main.js?v=1.0"></script>
 </body>
