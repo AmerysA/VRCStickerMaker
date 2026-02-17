@@ -18,77 +18,66 @@
         <!-- LEFT SIDEBAR: Creation Tools + Save -->
         <aside class="sidebar-left">
             <div class="sidebar-content">
-                <h1>VRC Sticker Maker</h1>
+                <h1 class="sidebar-title">VRC Sticker Maker</h1>
 
-                <!-- Input Group -->
-                <div class="control-group">
-                    <label for="image-upload">画像をアップロード</label>
-                    <input type="file" id="image-upload" accept="image/png, image/jpeg" style="display: none;">
-                    <button id="upload-btn">画像を選択</button>
+                <div class="control-row">
+                    <div class="control-group flex-1">
+                        <label for="image-upload">画像 <small
+                                style="font-weight: normal; opacity: 0.7;">(D&D対応)</small></label>
+                        <input type="file" id="image-upload" accept="image/png, image/jpeg" style="display: none;">
+                        <button id="upload-btn" class="compact-btn">画像を選択</button>
+                    </div>
                 </div>
 
                 <div class="control-group">
-                    <label for="bubble-text">テキスト入力</label>
+                    <label for="bubble-text">テキスト</label>
                     <input type="text" id="bubble-text" placeholder="メッセージを入力..." value="Hello!">
                 </div>
 
-                <!-- Bubble Settings -->
                 <div class="control-group">
-                    <label>吹き出し配色</label>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <div style="flex: 1; display: flex; flex-direction: column; gap: 0.25rem;">
-                            <span style="font-size: 0.7rem; color: #adb5bd;">背景</span>
-                            <input type="color" id="bg-color-picker" value="#3a4454"
-                                style="width: 100%; height: 30px; border: none; padding: 0;">
+                    <label>配色</label>
+                    <div class="color-picker-row">
+                        <div class="color-picker-item">
+                            <span class="small-label">背景</span>
+                            <input type="color" id="bg-color-picker" value="#3a4454">
                         </div>
-                        <div style="flex: 1; display: flex; flex-direction: column; gap: 0.25rem;">
-                            <span style="font-size: 0.7rem; color: #adb5bd;">枠線 (なしは背景と同色)</span>
-                            <input type="color" id="border-color-picker" value="#3a4454"
-                                style="width: 100%; height: 30px; border: none; padding: 0;">
+                        <div class="color-picker-item">
+                            <span class="small-label">枠線</span>
+                            <input type="color" id="border-color-picker" value="#3a4454">
                         </div>
                     </div>
                 </div>
 
                 <div class="control-group">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <label for="bubble-scale">吹き出しの大きさ</label>
-                        <button id="reset-bubble-scale" class="secondary"
-                            style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">リセット</button>
+                    <div class="label-with-action">
+                        <label for="bubble-scale">大きさ</label>
+                        <button id="reset-bubble-scale" class="secondary tiny-btn">リセット</button>
                     </div>
-                    <input type="range" id="bubble-scale" min="0.5" max="2" step="0.1" value="1.0" style="width: 100%;">
+                    <input type="range" id="bubble-scale" min="0.5" max="2" step="0.1" value="1.0">
                 </div>
 
-                <!-- Add Objects -->
                 <div class="control-group">
                     <label>コンポーネント追加</label>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button id="add-bubble-btn" class="secondary"
-                            style="width: 100%; margin-bottom: 0.5rem; padding: 0.5rem;">💭 吹き出しを追加</button>
-                        <button id="add-emoji-btn" class="secondary"
-                            style="width: 100%; margin-bottom: 0.5rem; padding: 0.5rem;">😀 絵文字を追加</button>
-                        <button class="secondary" onclick="addShape('star')" style="flex: 1; padding: 0.5rem;">⭐
-                            星</button>
-                        <button class="secondary" onclick="addShape('heart')" style="flex: 1; padding: 0.5rem;">❤️
-                            ハート</button>
-                        <button class="secondary" onclick="addShape('sparkle')" style="flex: 1; padding: 0.5rem;">✨
-                            輝き</button>
+                    <div class="button-grid">
+                        <button id="add-bubble-btn" class="secondary">💭 吹き出し</button>
+                        <button id="add-emoji-btn" class="secondary">😀 絵文字</button>
+                    </div>
+                    <div class="button-grid" style="margin-top: 0.4rem;">
+                        <button class="secondary tiny-btn" onclick="addShape('star')">⭐ 星</button>
+                        <button class="secondary tiny-btn" onclick="addShape('heart')">❤️ ﾊｰﾄ</button>
+                        <button class="secondary tiny-btn" onclick="addShape('sparkle')">✨ 輝き</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Fixed Footer in Left Sidebar -->
             <div class="sidebar-footer">
-                <div class="control-group">
-                    <label for="export-size">書き出し解像度</label>
-                    <select id="export-size"
-                        style="background-color: #1a1b1e; border: 1px solid var(--border-color); color: white; padding: 0.5rem; border-radius: 8px; width: 100%;">
-                        <option value="512">512 x 512 (標準)</option>
-                        <option value="1024">1024 x 1024 (高画質)</option>
+                <div class="control-row" style="margin-bottom: 0.5rem;">
+                    <select id="export-size" class="compact-select">
+                        <option value="512">512px (標準)</option>
+                        <option value="1024">1024px (高画質)</option>
                     </select>
-                </div>
-                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                    <button id="save-btn" style="flex: 2;">スタンプを保存</button>
-                    <button id="clear-btn" class="secondary" style="flex: 1;">リセット</button>
+                    <button id="save-btn" class="primary-btn flex-1">保存</button>
+                    <button id="clear-btn" class="secondary compact-btn">クリア</button>
                 </div>
                 <div class="legal-info">
                     <p><strong>VRChat 非公式コミュニティツール</strong></p>
@@ -110,6 +99,7 @@
                 <div class="nav-help">
                     <span><b>移動:</b> Space+ドラッグ / ホイールクリック</span>
                     <span><b>ズーム:</b> Wheel / +/-</span>
+                    <span><b>追加:</b> 画像ファイルをドロップ</span>
                 </div>
                 <div class="zoom-controls">
                     <button id="zoom-out" class="icon-btn">-</button>
@@ -165,6 +155,12 @@
         </aside>
     </div>
     <script src="main.js?v=1.0"></script>
+    <div id="drop-zone" class="hidden">
+        <div class="drop-zone-content">
+            <div class="drop-icon">📁</div>
+            <p>画像をドロップして追加</p>
+        </div>
+    </div>
 </body>
 
 </html>
