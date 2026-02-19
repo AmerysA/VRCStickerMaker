@@ -45,6 +45,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial content
     addSpeechBubble();
 
+    // Set initial text box state (will be updated by selection anyway)
+    const textInput = document.getElementById('bubble-text');
+    if (textInput) {
+        textInput.disabled = true;
+        textInput.value = "";
+    }
+
     // Initial centering
     centerArtboard();
 });
@@ -384,6 +391,7 @@ function onSelectionChanged() {
     const active = canvas.getActiveObject();
     const opacityInput = document.getElementById('layer-opacity');
     const scaleInput = document.getElementById('bubble-scale');
+    const textInput = document.getElementById('bubble-text');
 
     if (active) {
         if (opacityInput) opacityInput.value = (active.opacity || 1) * 100;
@@ -396,11 +404,24 @@ function onSelectionChanged() {
 
         currentBubbleGroup = bubble;
 
-        if (bubble && scaleInput) {
-            scaleInput.value = bubble.scaleX.toFixed(2);
+        if (bubble) {
+            if (scaleInput) scaleInput.value = bubble.scaleX.toFixed(2);
+            if (textInput) {
+                textInput.disabled = false;
+                textInput.value = bubble.item(1).text;
+            }
+        } else {
+            if (textInput) {
+                textInput.disabled = true;
+                textInput.value = "";
+            }
         }
     } else {
         currentBubbleGroup = null;
+        if (textInput) {
+            textInput.disabled = true;
+            textInput.value = "";
+        }
     }
     updateLayerList();
 }
