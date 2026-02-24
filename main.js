@@ -393,8 +393,15 @@ function onSelectionChanged() {
     const scaleInput = document.getElementById('bubble-scale');
     const textInput = document.getElementById('bubble-text');
 
+    const resetRotationBtn = document.getElementById('reset-rotation-btn');
+
     if (active) {
         if (opacityInput) opacityInput.value = (active.opacity || 1) * 100;
+        if (resetRotationBtn) {
+            resetRotationBtn.disabled = active.locked;
+            resetRotationBtn.title = active.locked ? "ロック中は回転をリセットできません" : "回転をリセット";
+        }
+
 
         // Identify bubble
         let bubble = null;
@@ -701,14 +708,18 @@ function updateLayerList() {
             <input type="color" value="${obj.fill}" class="layer-color-picker" title="色を変更" style="width:20px; height:20px; border:none; padding:0; background:none; cursor:pointer;">
         ` : '';
 
+        const lockIcon = obj.locked ? '🔒' : '🔓';
+        const lockTitle = obj.locked ? 'ロック解除' : 'ロック';
+
         div.innerHTML = `
             <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
                 ${colorPickerHTML}
                 <span>${name}</span>
             </div>
             <div class="layer-controls">
-                <button onclick="cloneLayer(${idx})">📄</button>
-                <button onclick="deleteLayer(${idx})" style="background-color: #fa5252;">✕</button>
+                <button onclick="toggleLock(${idx})" title="${lockTitle}">${lockIcon}</button>
+                <button onclick="cloneLayer(${idx})" title="複製">📄</button>
+                <button onclick="deleteLayer(${idx})" style="background-color: #fa5252;" title="削除">✕</button>
             </div>
         `;
 
@@ -799,6 +810,32 @@ function saveCanvas() {
 
 // Global exposure for HTML inline clicks
 window.addShape = addShape;
+window.toggleLock = toggleLock;
+
+function toggleLock(idx) {
+    const obj = canvas.getObjects()[idx];
+    if (!obj) return;
+
+    const newState = !obj.locked;
+    obj.set({
+        locked: newState,
+        selectable: !newState,
+        evented: !newState,
+        hasControls: !newState,
+        hasBorders: !newState
+    });
+
+    if (newState) {
+        // If locking the currently active object, deselect it
+        if (canvas.getActiveObject() === obj) {
+            canvas.discardActiveObject();
+        }
+    }
+
+    canvas.renderAll();
+    updateLayerList();
+}
+
 window.cloneLayer = function (idx) {
     const objects = canvas.getObjects();
     const obj = objects[idx];
@@ -921,7 +958,7 @@ async function addEmoji(char) {
 
 function resetRotation() {
     const active = canvas.getActiveObject();
-    if (active) {
+    if (active && !active.locked) {
         active.set('angle', 0);
         active.setCoords();
         canvas.renderAll();
