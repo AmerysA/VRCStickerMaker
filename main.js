@@ -1,4 +1,10 @@
+/**
+ * VRChat Sticker Maker - main.js
+ * Version: 1.1.0
+ * Last Updated: 2026-02-24 23:20
+ */
 // Constants
+
 const CANVAS_SIZE = 512;
 const BUBBLE_PADDING = 16;
 const CORNER_RADIUS = 12;
